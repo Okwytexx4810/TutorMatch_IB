@@ -30,10 +30,15 @@ export const ROUTES = {
   tutorRequests: "/tutor/requests",
   tutorBookings: "/tutor/bookings",
   admin: "/admin",
+  about: "/about",
+  contact: "/contact",
+  privacy: "/privacy",
+  terms: "/terms",
 } as const;
 
-/** Primary navigation shown on public pages. */
+/** Primary navigation shown on public pages. Anchors resolve on the home page. */
 export const publicNavLinks = [
-  { href: ROUTES.findTutors, label: "Find tutors" },
-  { href: ROUTES.tutorDashboard, label: "Teach on TutorMatch" },
+  { href: ROUTES.findTutors, label: "Find Tutors" },
+  { href: "/#how-it-works", label: "How It Works" },
+  { href: "/#for-tutors", label: "For Tutors" },
 ] as const;
