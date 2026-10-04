@@ -314,7 +314,7 @@ flowchart TD
 | `OPENAI_API_KEY`                        | **No**                  |
 | `SUPABASE_SERVICE_ROLE_KEY`             | **No**                  |
 | `NEXT_PUBLIC_SUPABASE_URL`              | Yes                     |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`         | Yes                     |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`    | Yes                     |
 
 Any value without the `NEXT_PUBLIC_` prefix stays on the server. Environment
 reads go through `lib/env.ts`, which validates values with Zod and makes the

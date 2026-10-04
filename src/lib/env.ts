@@ -36,25 +36,61 @@ export function serverEnv(): ServerEnv {
   });
 }
 
+/**
+ * The bare project URL, e.g. `https://<ref>.supabase.co`.
+ *
+ * supabase-js appends its own paths (`/auth/v1`, `/rest/v1`) to whatever URL it
+ * is given, so the "REST endpoint" value copied from the dashboard - which ends
+ * in `/rest/v1/` - silently turns every auth call into a request to
+ * `/rest/v1/auth/v1/...`, which does not exist and 404s. `z.string().url()`
+ * accepts that value happily, which is why the shape is enforced here rather
+ * than assumed from a URL check.
+ */
+const supabaseProjectUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => new URL(value).pathname === "/", {
+    message:
+      "Must be the bare project URL (https://<ref>.supabase.co), with no trailing path such as /rest/v1/",
+  });
+
 const publicEnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  NEXT_PUBLIC_SUPABASE_URL: supabaseProjectUrlSchema,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
 });
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
 
+function readPublicEnvSource(): Record<string, string | undefined> {
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  };
+}
+
 /**
  * Read and validate browser-safe environment variables.
  *
- * These are the only values a Client Component may rely on. Supabase's anon
- * key is safe to ship because Row Level Security is the real access control
- * boundary; the service role key is not, and must never be public.
+ * These are the only values a Client Component may rely on. Supabase's
+ * publishable key is safe to ship because Row Level Security is the real access
+ * control boundary; the service role key is not, and must never be public.
+ *
+ * @throws {z.ZodError} when Supabase has not been configured.
  */
 export function publicEnv(): PublicEnv {
-  return publicEnvSchema.parse({
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-  });
+  return publicEnvSchema.parse(readPublicEnvSource());
+}
+
+/**
+ * Whether the public Supabase variables are present and well formed.
+ *
+ * Checked instead of caught, because a build or a marketing page render must not
+ * depend on Supabase being configured. Callers use this to degrade honestly
+ * rather than to silently skip an authorization check.
+ */
+export function isSupabaseConfigured(): boolean {
+  return publicEnvSchema.safeParse(readPublicEnvSource()).success;
 }
