@@ -12,6 +12,26 @@ export const USER_ROLES = ["student", "parent", "tutor", "admin"] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 
+/**
+ * Row shape of the database-backed `profiles` table.
+ *
+ * `role` here is the *trusted* application role: it is written once by the
+ * `handle_new_user()` trigger, is not updatable by the account holder, and is
+ * the only role value the server authorises against. Anything read from
+ * `user_metadata` is presentation data, never a permission.
+ */
+export interface UserProfile {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  role: UserRole;
+  phone: string | null;
+  location: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Canonical teaching levels used across search, matching and AI extraction. */
 export const EDUCATION_LEVELS = [
   "primary",

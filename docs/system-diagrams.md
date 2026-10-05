@@ -319,3 +319,30 @@ flowchart TD
 Any value without the `NEXT_PUBLIC_` prefix stays on the server. Environment
 reads go through `lib/env.ts`, which validates values with Zod and makes the
 server-only intent explicit.
+
+### Authorisation chain (Phase 4A)
+
+```
+registration form                trusted, database-backed
+  role claim ──▶ user_metadata         profiles.role
+  (a request)      (editable)          (written once by handle_new_user,
+                                       not updatable by the account)
+                         │                     │
+                         ▼                     ▼
+                 UX routing only      requireRole()  ──▶  RLS policies
+                 (not a permission)   src/lib/auth     supabase/migrations
+                                       /session.ts
+```
+
+Two rules make this hold:
+
+1. **The browser never supplies an identity.** Every policy resolves the caller
+   from `auth.uid()`, and every server guard reads the role from `profiles`,
+   which no client can write.
+2. **The server is not the only boundary.** `requireRole()` decides which page to
+   render; RLS independently decides which rows that page may read. A bug in the
+   guard cannot expose another user's rows.
+
+`admin` is refused by the `handle_new_user()` trigger, so it cannot be claimed at
+signup, and `profiles.role` carries no `UPDATE` grant to any client role, so it
+cannot be claimed afterwards. The first administrator is granted by hand.

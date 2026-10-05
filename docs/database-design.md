@@ -456,3 +456,55 @@ Physics, Chemistry, Biology, Government, Economics), locations (Bodija, Iyana
 Ole, Ikeja, Yaba, Lekki, Abuja), teaching modes and rates from ₦3,000 to
 ₦12,000. A spread of rates and availability is what makes the matching score
 visibly meaningful when demonstrated.
+
+---
+
+## 8. Implementation notes (Phase 4A)
+
+Implemented in `supabase/migrations/20260103000000_initial_schema.sql`. Where the
+migration departs from the design above, it is because the design as written
+cannot work or cannot be secure. Each deviation is deliberate.
+
+### Corrected
+
+| Design said | Migration does | Why |
+| --- | --- | --- |
+| `profiles_select_admin` checks `exists (select 1 from profiles ...)` inside a `profiles` policy | Calls `is_admin()`, a `SECURITY DEFINER` function | A policy on `profiles` that queries `profiles` self-references and Postgres aborts with *"infinite recursion detected in policy"*. |
+| `tutor_profiles_insert_own` checks only that the caller holds the `tutor` role | Also requires `profile_id = auth.uid()` | As written, any tutor could create a tutor profile against another user's account. |
+| `profiles_update_own` grants `for update` on the whole row | `role` and `id` excluded from the `UPDATE` column grant | Otherwise any account could set its own `role` to `admin`, which defeats the entire trusted-role model. |
+| `tutor_profiles.is_verified` is "protected by a column-level grant" | Grant is stated explicitly in the migration | The design names the mechanism but not the statement. `is_verified` is absent from both the `INSERT` and `UPDATE` column lists. |
+| `availability_owner_write` is `for all` with `USING` only | Adds `WITH CHECK` | Without it, `USING` is reused for `INSERT`, which is weaker than intended and obscures intent. |
+| — | `tutor_ratings` view is created `with (security_invoker = true)` | A plain view runs as its owner and would bypass the `reviews` policies entirely. |
+
+### Added
+
+The design specifies read and update paths but leaves ordinary lifecycle actions
+unreachable, which would strand rows with no way to remove them:
+
+- `tutor_profiles_delete_own`, `tutor_requests_requester_delete`,
+  `reviews_author_delete`. Deletion is owner-scoped, and admin-scoped on requests
+  and reviews.
+- `reviews` deliberately has **no** `UPDATE` policy: a rating is not editable.
+
+### Left out
+
+- **`index (tutor_id)` on `tutor_availability`.** Already covered as the leading
+  column of `unique (tutor_id, day, period)`; a second index is a pure duplicate.
+- **`teaching_mode` enum.** No column in this schema uses it. It is introduced in
+  the phase that adds tutor discovery, rather than created speculatively.
+- **Write policies on `bookings`.** The design defines only `bookings_party_read`.
+  Booking creation and confirmation arrive with the booking phase.
+
+### Notes
+
+- `education_level` is referenced by this design but never defined in it. Its
+  values are taken from `EDUCATION_LEVELS` in `src/types/domain.ts` so the
+  database and the TypeScript contract cannot drift. This includes `adult`, which
+  the enum here does list only because the type does.
+- Ownership is resolved through `owns_tutor_profile()`, which reads
+  `tutor_profiles.profile_id` as a definer. Checking ownership by querying
+  `tutor_profiles` directly from another table's policy would make the two tables
+  reference each other.
+- `profiles.email` is `NOT NULL`, so the backfill migration skips any auth user
+  with a null email rather than aborting. This project is email/password only, so
+  in practice every account has one.

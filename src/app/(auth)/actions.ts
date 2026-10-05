@@ -12,8 +12,8 @@ import {
   type AuthFormState,
 } from "@/lib/auth/action-state";
 import { authErrorMessage } from "@/lib/auth/errors";
-import { homeForRole, intendedRole } from "@/lib/auth/roles";
-import { requireUser } from "@/lib/auth/session";
+import { homeForRole } from "@/lib/auth/roles";
+import { getRole, readTrustedRole, requireUser } from "@/lib/auth/session";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { ROUTES } from "@/lib/site-config";
 import {
@@ -63,13 +63,17 @@ async function requestOrigin(): Promise<string> {
  * Sanitise the `next` query parameter.
  *
  * Only same-site absolute paths are allowed, so `?next=https://evil.example`
- * cannot turn the login flow into an open redirect. The cast is safe because
- * the checks above leave nothing but a site-relative path.
+ * cannot turn the login flow into an open redirect. A backslash is rejected too:
+ * per the WHATWG URL standard it is treated as a path separator for http(s), so
+ * `/\evil.example` would otherwise resolve as a protocol-relative URL and leave
+ * the site after sign-in. The cast is safe because the checks above leave nothing
+ * but a site-relative path.
  */
 function safeNextPath(candidate: FormDataEntryValue | string | null): Route | "" {
   if (typeof candidate !== "string") return "";
   if (!candidate.startsWith("/")) return "";
   if (candidate.startsWith("//")) return "";
+  if (candidate.includes("\\")) return "";
   return candidate as Route;
 }
 
@@ -108,7 +112,11 @@ export async function signInAction(
   }
 
   const next = safeNextPath(formData.get("next"));
-  const destination = next || homeForRole(intendedRole(data.user));
+  // The role comes from `profiles`, so a tampered metadata claim cannot steer
+  // the destination. The session is in memory only at this point, so the live
+  // client is passed explicitly.
+  const destination =
+    next || homeForRole(await readTrustedRole(supabase, data.user.id));
 
   revalidatePath("/", "layout");
   redirect(destination);
@@ -143,8 +151,8 @@ export async function signUpAction(
     options: {
       emailRedirectTo: `${await requestOrigin()}${ROUTES.authCallback}`,
       // `role` here is the validated public value, never a client-supplied
-      // string. Phase 4 copies it onto `profiles.role` under RLS; until then it
-      // is a UX hint stored in user metadata and nothing more.
+      // string. It is a request: `handle_new_user()` in the database decides
+      // what lands on `profiles.role`, and that stored value is what authorises.
       data: { full_name: fullName, role },
     },
   });
@@ -154,12 +162,12 @@ export async function signUpAction(
   }
 
   // A session is only returned when email confirmation is disabled in Supabase.
-  if (!data.session) {
+  if (!data.session || !data.user) {
     return authSuccess("Check your inbox to confirm your email, then sign in.");
   }
 
   revalidatePath("/", "layout");
-  redirect(homeForRole(role));
+  redirect(homeForRole(await readTrustedRole(supabase, data.user.id)));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -214,7 +222,7 @@ export async function resetPasswordAction(
 
   // Reaching this page at all requires the recovery session that the auth
   // callback established from the emailed link.
-  const user = await requireUser(ROUTES.resetPassword);
+  await requireUser(ROUTES.resetPassword);
   const supabase = await getServerSupabase();
 
   const { error } = await supabase.auth.updateUser({
@@ -226,7 +234,7 @@ export async function resetPasswordAction(
   }
 
   revalidatePath("/", "layout");
-  redirect(homeForRole(intendedRole(user)));
+  redirect(homeForRole(await getRole()));
 }
 
 /* -------------------------------------------------------------------------- */

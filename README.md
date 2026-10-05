@@ -128,9 +128,51 @@ work. AI is an accelerator, not a dependency.
 ## Status
 
 **Phase 1 — Project foundation: complete.**
+**Phase 2 — Design system and landing page: complete.**
+**Phase 3 — Authentication: complete.**
+**Phase 4A — Database schema and role authorisation: applied.**
 
-Foundation, routing architecture, design system and documentation are in place.
-Authentication, the Supabase schema, the matching engine and OpenAI integration
-are deliberately not implemented yet. See
+The foundation, routing architecture, design system and landing page are in place.
+Authentication works end to end. The Phase 4A migrations in
+[`supabase/migrations`](supabase/migrations) define the full schema, the
+`handle_new_user()` profile trigger and Row Level Security, and `requireRole()`
+now reads the authoritative role from the database `profiles` table.
+
+Both migrations are applied to the linked remote Supabase project, and
+`supabase migration list` reports local and remote in sync. The role guards on
+`/tutor/*` and `/admin/*` are therefore live rather than dormant. See
 [development-plan.md](docs/development-plan.md) for what each remaining phase
 delivers.
+
+Phase 4K verified the student path by hand against the linked remote project:
+registration, the emailed confirmation link returning through `/auth/callback`,
+sign-in routing to `/dashboard`, and a student being redirected away from both
+`/tutor/dashboard` and `/admin`.
+
+**Not yet verified:** the parent, tutor and admin authentication paths have not
+been individually tested. No administrator account exists yet, so `/admin` cannot
+be exercised until one is granted by hand.
+
+The matching engine, tutor discovery, booking workflow and OpenAI integration are
+deliberately not implemented yet.
+
+### Applying the database
+
+With the Supabase CLI installed and linked:
+
+```bash
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+`supabase db push` applies **migrations only**. It does not touch Auth settings.
+Reconcile [`supabase/config.toml`](supabase/config.toml) against the target
+project's own redirect configuration before running `supabase config push`, which
+pushes Auth settings as well and would overwrite them.
+
+Then grant the first administrator, which deliberately cannot happen through the
+client API:
+
+```sql
+update public.profiles set role = 'admin' where id = '<user uuid>';
+```

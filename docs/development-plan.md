@@ -39,9 +39,9 @@ before cutting 7.
 | Phase | Name                              | Status      |
 | ----- | --------------------------------- | ----------- |
 | 1     | Project foundation                | **Complete**|
-| 2     | Design system and landing page    | Not started |
-| 3     | Authentication                    | Not started |
-| 4     | Supabase database                 | Not started |
+| 2     | Design system and landing page    | **Complete**|
+| 3     | Authentication                    | **Complete**|
+| 4     | Supabase database                 | In progress (schema applied, seeding pending) |
 | 5     | Tutor onboarding and profile      | Not started |
 | 6     | Tutor discovery, search, filtering| Not started |
 | 7     | Matching engine                   | Not started |
@@ -51,6 +51,48 @@ before cutting 7.
 | 11    | Testing                           | Not started |
 | 12    | Deployment                        | Not started |
 | 13    | Presentation preparation          | Not started |
+
+### Phase 4A — schema and authorisation (applied)
+
+Delivered in this step:
+
+- `supabase/migrations/20260103000000_initial_schema.sql`: 8 tables, 6 enums, the
+  `handle_new_user()` profile trigger, `is_admin()`, RLS on every table, and the
+  grants that keep `role` out of the account holder's reach.
+- `supabase/migrations/20260103001000_backfill_existing_profiles.sql`: one-off
+  backfill for accounts created during Phase 3.
+- `requireRole()` in `src/lib/auth/session.ts`, reading the trusted
+  `profiles.role`, with `/tutor/*` and `/admin/*` now enforcing it.
+
+Both migrations are applied to the linked remote project, and `supabase
+migration list` reports local and remote in sync.
+
+Not yet done, and required before every role means something:
+
+- No administrator exists. `handle_new_user()` refuses `admin` from metadata, so
+  the first one must be granted by hand.
+- Tutor seeding, discovery UI, onboarding, matching and booking writes all remain
+  future phases.
+
+### Phase 4K — controlled authentication test (passed)
+
+Verified by hand against the linked remote project on `http://localhost:3001`,
+which matches the project's Auth redirect allow-list of
+`http://localhost:3001/**`. Remote email confirmation is required, so the test
+covered the whole confirmation path:
+
+- Student registration created the Auth user and its `profiles` row, returned the
+  "check your inbox" message, and correctly issued no session beforehand.
+- The confirmation link returned through `/auth/callback` and established the
+  session.
+- Sign-in sent the student to `/dashboard`, with the role read from
+  `profiles.role` rather than user metadata.
+- `/dashboard` was allowed. `/tutor/dashboard` and `/admin` both redirected the
+  student away, so `requireRole()` denies cross-role access.
+- Sign-out ended the session and `/login` served the form normally afterwards.
+
+Only the student path is covered. Parent, tutor and admin are still unverified,
+and an administrator has to be granted before `/admin` can be exercised.
 
 ---
 

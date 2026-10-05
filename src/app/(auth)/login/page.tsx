@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/forms/login-form";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
-import { getUser } from "@/lib/auth/session";
-import { homeForRole, intendedRole } from "@/lib/auth/roles";
+import { getRole, getUser } from "@/lib/auth/session";
+import { homeForRole } from "@/lib/auth/roles";
 import { ROUTES } from "@/lib/site-config";
 
 /** Errors the auth callback can hand back via the query string. */
@@ -24,7 +24,8 @@ export default async function LoginPage({
   // The Proxy already redirects signed-in users, but a cached page can still be
   // rendered directly, so the page re-checks before rendering a login form.
   const user = await getUser();
-  if (user) redirect(homeForRole(intendedRole(user)));
+  // Routing follows the database role, never the metadata claim.
+  if (user) redirect(homeForRole(await getRole()));
 
   return (
     <div className="w-full max-w-md">

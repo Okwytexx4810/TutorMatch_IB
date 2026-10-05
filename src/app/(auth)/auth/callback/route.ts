@@ -1,7 +1,8 @@
 import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { homeForRole, intendedRole } from "@/lib/auth/roles";
+import { homeForRole } from "@/lib/auth/roles";
+import { readTrustedRole } from "@/lib/auth/session";
 import { ROUTES } from "@/lib/site-config";
 
 /** Reason keys the login page knows how to phrase. */
@@ -20,11 +21,19 @@ type CallbackFailure = "expired" | "missing_code" | "unconfigured";
  * reaches the app.
  */
 
-/** Same-site paths only. Blocks `?next=https://evil.example`. */
+/**
+ * Same-site paths only.
+ *
+ * Blocks `?next=https://evil.example`. Backslashes are rejected as well, because
+ * the WHATWG URL standard treats `\` as a path separator for http(s), so
+ * `/\evil.example` would resolve as a protocol-relative URL and send the freshly
+ * authenticated user off-site.
+ */
 function safeNext(candidate: string | null): string | null {
   if (!candidate) return null;
   if (!candidate.startsWith("/")) return null;
   if (candidate.startsWith("//")) return null;
+  if (candidate.includes("\\")) return null;
   return candidate;
 }
 
@@ -62,7 +71,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const pending: { name: string; value: string; options: Parameters<typeof serializeCookieHeader>[2] }[] = [];
 
-  const supabase = createServerClient<never>(
+  const supabase = createServerClient(
     supabaseUrl,
     supabasePublishableKey,
     {
@@ -82,11 +91,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         token_hash: tokenHash ?? "",
       });
 
-  if (error) {
+  if (error || !data.user) {
     return failure("expired");
   }
 
-  const destination = next ?? homeForRole(intendedRole(data.user));
+  // Default destination follows the database role. `next` still wins when it is
+  // present, and `isSafeNextPath` has already rejected anything off-site.
+  //
+  // The session established above lives in this client's memory only, because the
+  // cookies are attached to the outgoing response, so the live client is handed
+  // to the reader rather than reading the (still anonymous) request cookies.
+  const destination =
+    next ??
+    homeForRole(await readTrustedRole(supabase, data.user.id));
   const response = NextResponse.redirect(new URL(destination, url.origin));
 
   for (const { name, value, options } of pending) {
