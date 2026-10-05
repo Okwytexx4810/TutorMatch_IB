@@ -13,6 +13,34 @@ export const USER_ROLES = ["student", "parent", "tutor", "admin"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 /**
+ * Row shape of the database-backed `tutor_profiles` table.
+ *
+ * This is the write model for the tutor profile form, and deliberately NOT
+ * `TutorProfile` from `types/tutor.ts`, which is the richer read model the
+ * matching engine consumes (it adds subjects, availability and ratings).
+ *
+ * `is_verified` is present because reads need it, and is never writable by the
+ * account holder: it is absent from the `INSERT` and `UPDATE` column grants in
+ * the Phase 4 migration, so no tutor can set it.
+ */
+export interface TutorProfileRecord {
+  id: string;
+  /** Owner. Always the authenticated user; never accepted from a form. */
+  profile_id: string;
+  headline: string | null;
+  bio: string | null;
+  location: string;
+  hourly_rate: number;
+  years_of_experience: number;
+  /** Moderation decision. Read-only for tutors. */
+  is_verified: boolean;
+  /** 0-100. Derived on the server from submitted data, never client-supplied. */
+  profile_completeness: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * Row shape of the database-backed `profiles` table.
  *
  * `role` here is the *trusted* application role: it is written once by the
