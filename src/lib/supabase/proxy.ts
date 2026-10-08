@@ -1,4 +1,4 @@
-import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
+import { createServerClient, serializeCookieHeader } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -53,9 +53,18 @@ export async function updateSession(request: NextRequest): Promise<Response> {
     {
       cookies: {
         getAll() {
-          return parseCookieHeader(request.headers.get("Cookie") ?? "");
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet, headers) {
+          // Write the refreshed session back onto the *request* as well as the
+          // response. The Proxy and the Server Components/Actions that follow
+          // use independent Supabase clients with independent cookie stores, so
+          // unless the new cookies are forwarded on the request the app client
+          // reads the stale token and attempts a second refresh, which fails
+          // with `refresh_token_already_used` and signs the user out mid-flight.
+          for (const { name, value } of cookiesToSet) {
+            request.cookies.set(name, value);
+          }
           pendingCookies.push(...cookiesToSet);
           Object.assign(pendingHeaders, headers);
         },
@@ -70,14 +79,35 @@ export async function updateSession(request: NextRequest): Promise<Response> {
 
   const { pathname, search } = request.nextUrl;
 
-  if (error || !user) {
-    if (isProtectedPath(pathname)) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/login";
-      // Carries the original destination so login can return the user to it.
-      redirectUrl.searchParams.set("next", `${pathname}${search}`);
-      response = NextResponse.redirect(redirectUrl);
-    }
+  // Server Actions send a `next-action` header (Next.js strips only the Flight
+  // cache headers from the Proxy, not this one). Redirecting an action request
+  // replaces the RSC response with an HTML redirect, which the client surfaces
+  // as "An unexpected response was received from the server". Let the action run
+  // and re-check the session itself with `requireRole`, the real boundary.
+  const isServerAction = request.headers.has("next-action");
+
+  // A transient reuse of a refresh token means another request in the same
+  // rotation window already consumed it; the session is not actually gone, so
+  // do not bounce the user to login on it.
+  const isRefreshTokenAlreadyUsed =
+    Boolean(error) &&
+    (error as { code?: unknown }).code === "refresh_token_already_used";
+
+  if (
+    !isServerAction &&
+    !isRefreshTokenAlreadyUsed &&
+    isProtectedPath(pathname) &&
+    (error || !user)
+  ) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    // Carries the original destination so login can return the user to it.
+    redirectUrl.searchParams.set("next", `${pathname}${search}`);
+    response = NextResponse.redirect(redirectUrl);
+  } else if (pendingCookies.length > 0) {
+    // Rebuild the response so `NextResponse.next` forwards the refreshed
+    // cookies to this same request's Server Components and Server Actions.
+    response = NextResponse.next({ request });
   }
 
   for (const { name, value, options } of pendingCookies) {
