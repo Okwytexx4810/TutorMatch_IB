@@ -32,7 +32,7 @@ export default function DashboardPage() {
         description="Your tutor requests, bookings and upcoming sessions."
         actions={
           <Button asChild size="sm">
-            <Link href={ROUTES.dashboardFindTutor}>
+            <Link href={ROUTES.findTutors}>
               <Search className="size-4" aria-hidden="true" />
               Find a tutor
             </Link>
@@ -65,7 +65,7 @@ export default function DashboardPage() {
         description="Describe what you need and we will shortlist tutors who match your subject, location, availability and budget."
         action={
           <Button asChild size="sm">
-            <Link href={ROUTES.dashboardFindTutor}>Describe your needs</Link>
+            <Link href={ROUTES.findTutors}>Describe your needs</Link>
           </Button>
         }
       />

@@ -9,7 +9,7 @@ export const siteConfig = {
   description:
     "Describe what you need in plain English and TutorMatch IB matches you with verified tutors by subject, location, availability, budget and experience.",
   url:
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000",
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3001",
   contactEmail: "support@tutormatch.ng",
 } as const;
 

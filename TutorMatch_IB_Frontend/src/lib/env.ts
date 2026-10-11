@@ -57,7 +57,7 @@ const supabaseProjectUrlSchema = z
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: supabaseProjectUrlSchema,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-  NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3001"),
 });
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;

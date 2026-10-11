@@ -3,7 +3,8 @@
 Target: **Supabase PostgreSQL**. This is the design to implement in Phase 4.
 
 > The schema is **not** created in Phase 1. It is documented now so the types in
-> `src/types` and the contracts in `src/lib` have a fixed target to code against.
+> `TutorMatch_IB_Frontend/src/types` and the contracts in
+> `TutorMatch_IB_Frontend/src/lib` have a fixed target to code against.
 
 ---
 
@@ -432,7 +433,7 @@ route handler / server action
 lib/supabase/queries/tutors.ts     ← one typed query, RLS applied
    │
    ▼
-TutorProfile[]                     ← matches src/types/tutor.ts
+TutorProfile[]                     ← matches TutorMatch_IB_Frontend/src/types/tutor.ts
    │
    ▼
 lib/matching/rank.ts               ← pure, deterministic
@@ -461,9 +462,10 @@ visibly meaningful when demonstrated.
 
 ## 8. Implementation notes (Phase 4A)
 
-Implemented in `supabase/migrations/20260103000000_initial_schema.sql`. Where the
-migration departs from the design above, it is because the design as written
-cannot work or cannot be secure. Each deviation is deliberate.
+Implemented in
+`TutorMatch_IB_Backend/supabase/migrations/20260103000000_initial_schema.sql`.
+Where the migration departs from the design above, it is because the design as
+written cannot work or cannot be secure. Each deviation is deliberate.
 
 ### Corrected
 
@@ -498,9 +500,10 @@ unreachable, which would strand rows with no way to remove them:
 ### Notes
 
 - `education_level` is referenced by this design but never defined in it. Its
-  values are taken from `EDUCATION_LEVELS` in `src/types/domain.ts` so the
-  database and the TypeScript contract cannot drift. This includes `adult`, which
-  the enum here does list only because the type does.
+  values are taken from `EDUCATION_LEVELS` in
+  `TutorMatch_IB_Frontend/src/types/domain.ts` so the database and the TypeScript
+  contract cannot drift. This includes `adult`, which the enum here does list only
+  because the type does.
 - Ownership is resolved through `owns_tutor_profile()`, which reads
   `tutor_profiles.profile_id` as a definer. Checking ownership by querying
   `tutor_profiles` directly from another table's policy would make the two tables

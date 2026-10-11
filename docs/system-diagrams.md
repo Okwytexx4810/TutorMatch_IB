@@ -330,8 +330,10 @@ registration form                trusted, database-backed
                          │                     │
                          ▼                     ▼
                  UX routing only      requireRole()  ──▶  RLS policies
-                 (not a permission)   src/lib/auth     supabase/migrations
-                                       /session.ts
+                 (not a permission)   TutorMatch_IB_    TutorMatch_IB_
+                                      Frontend/src/     Backend/supabase/
+                                      lib/auth/         migrations
+                                      session.ts
 ```
 
 Two rules make this hold:

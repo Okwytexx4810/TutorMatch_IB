@@ -26,13 +26,17 @@ experience, and every score can be explained.
 
 ## Getting started
 
+The Next.js application lives in `TutorMatch_IB_Frontend/`. Run all frontend
+commands from that directory:
+
 ```bash
+cd TutorMatch_IB_Frontend
 npm install
 cp .env.example .env.local     # fill in real values as phases progress
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3001](http://localhost:3001).
 
 The app runs without any environment variables in Phase 1. `publicEnv()` is only
 called once Supabase is wired up (Phase 3), so nothing fails during a plain
@@ -41,6 +45,8 @@ called once Supabase is wired up (Phase 3), so nothing fails during a plain
 ---
 
 ## Scripts
+
+Run these from `TutorMatch_IB_Frontend/`.
 
 | Command             | Purpose                                       |
 | ------------------- | --------------------------------------------- |
@@ -55,8 +61,12 @@ called once Supabase is wired up (Phase 3), so nothing fails during a plain
 
 ## Project structure
 
+All frontend source lives under `TutorMatch_IB_Frontend/`. Supabase
+configuration and migrations live separately, in
+`TutorMatch_IB_Backend/supabase/`.
+
 ```
-src/
+TutorMatch_IB_Frontend/src/
 ├── app/                  # routing only
 │   ├── (marketing)/      # public pages — header + footer
 │   ├── (auth)/           # /login, /register
@@ -130,19 +140,21 @@ work. AI is an accelerator, not a dependency.
 **Phase 1 — Project foundation: complete.**
 **Phase 2 — Design system and landing page: complete.**
 **Phase 3 — Authentication: complete.**
-**Phase 4A — Database schema and role authorisation: applied.**
+**Phase 4A — Database schema and role authorisation: implemented.**
 
 The foundation, routing architecture, design system and landing page are in place.
 Authentication works end to end. The Phase 4A migrations in
-[`supabase/migrations`](supabase/migrations) define the full schema, the
-`handle_new_user()` profile trigger and Row Level Security, and `requireRole()`
-now reads the authoritative role from the database `profiles` table.
+[`TutorMatch_IB_Backend/supabase/migrations`](TutorMatch_IB_Backend/supabase/migrations)
+define the full schema, the `handle_new_user()` profile trigger and Row Level
+Security, and `requireRole()` now reads the authoritative role from the database
+`profiles` table.
 
-Both migrations are applied to the linked remote Supabase project, and
-`supabase migration list` reports local and remote in sync. The role guards on
-`/tutor/*` and `/admin/*` are therefore live rather than dormant. See
-[development-plan.md](docs/development-plan.md) for what each remaining phase
-delivers.
+The migrations are intended to be applied to the linked remote Supabase project.
+Remote migration status has not been independently verified here, so the role
+guards on `/tutor/*` and `/admin/*` should be treated as live only once
+`supabase migration list` confirms local and remote are in sync against the
+target project. See [development-plan.md](docs/development-plan.md) for what each
+remaining phase delivers.
 
 Phase 4K verified the student path by hand against the linked remote project:
 registration, the emailed confirmation link returning through `/auth/callback`,
@@ -158,17 +170,21 @@ deliberately not implemented yet.
 
 ### Applying the database
 
-With the Supabase CLI installed and linked:
+Supabase configuration and migrations live in `TutorMatch_IB_Backend/supabase/`.
+With the Supabase CLI installed, run these from `TutorMatch_IB_Backend/`:
 
 ```bash
+cd TutorMatch_IB_Backend
 supabase link --project-ref <project-ref>
 supabase db push
 ```
 
 `supabase db push` applies **migrations only**. It does not touch Auth settings.
-Reconcile [`supabase/config.toml`](supabase/config.toml) against the target
-project's own redirect configuration before running `supabase config push`, which
-pushes Auth settings as well and would overwrite them.
+Reconcile
+[`TutorMatch_IB_Backend/supabase/config.toml`](TutorMatch_IB_Backend/supabase/config.toml)
+against the target project's own redirect configuration before running
+`supabase config push`, which pushes Auth settings as well and would overwrite
+them.
 
 Then grant the first administrator, which deliberately cannot happen through the
 client API:

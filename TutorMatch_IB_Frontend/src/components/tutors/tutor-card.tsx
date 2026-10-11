@@ -3,6 +3,7 @@ import {
   BriefcaseBusiness,
   MapPin,
   Star,
+  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -58,6 +59,11 @@ export function TutorCard({
   const visibleSubjects = tutor.subjects.slice(0, 3);
   const hiddenSubjectCount = tutor.subjects.length - visibleSubjects.length;
 
+  // `profiles` has no public read policy, so discovery rows arrive without a
+  // full name. Fall back to the tutor's own headline rather than inventing one.
+  const displayName = tutor.fullName.trim() || tutor.headline?.trim() || "Tutor";
+  const hasFullName = tutor.fullName.trim().length > 0;
+
   return (
     <Card
       className={cn(
@@ -68,9 +74,15 @@ export function TutorCard({
       <CardHeader className="px-5 pt-5 pb-4">
         <div className="flex items-start justify-between gap-3">
           <Avatar size="lg" className="size-12">
-            <AvatarFallback className="bg-brand-navy-deep font-medium text-primary-foreground">
-              {initialsOf(tutor.fullName)}
-            </AvatarFallback>
+            {hasFullName ? (
+              <AvatarFallback className="bg-brand-navy-deep font-medium text-primary-foreground">
+                {initialsOf(tutor.fullName)}
+              </AvatarFallback>
+            ) : (
+              <AvatarFallback className="bg-brand-navy-deep text-primary-foreground">
+                <UserRound className="size-5" aria-hidden="true" />
+              </AvatarFallback>
+            )}
           </Avatar>
 
           {typeof matchScore === "number" ? (
@@ -85,7 +97,7 @@ export function TutorCard({
 
         <div>
           <CardTitle className="flex items-center gap-1.5 text-base">
-            {tutor.fullName}
+            {displayName}
             {tutor.isVerified ? (
               <span className="inline-flex items-center" title="Verified tutor">
                 <BadgeCheck

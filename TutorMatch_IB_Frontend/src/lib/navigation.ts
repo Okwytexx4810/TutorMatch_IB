@@ -19,7 +19,7 @@ import { ROUTES } from "@/lib/site-config";
 
 export const studentNavItems: readonly NavItem[] = [
   { href: ROUTES.dashboard, label: "Overview", icon: LayoutDashboard },
-  { href: ROUTES.dashboardFindTutor, label: "Find a tutor", icon: Search },
+  { href: ROUTES.findTutors, label: "Find a tutor", icon: Search },
   { href: ROUTES.dashboardRequests, label: "My requests", icon: Inbox },
   { href: ROUTES.dashboardBookings, label: "Bookings", icon: CalendarDays },
   { href: ROUTES.dashboardProfile, label: "Profile", icon: UserRound },

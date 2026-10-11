@@ -41,7 +41,7 @@ before cutting 7.
 | 1     | Project foundation                | **Complete**|
 | 2     | Design system and landing page    | **Complete**|
 | 3     | Authentication                    | **Complete**|
-| 4     | Supabase database                 | In progress (schema applied, seeding pending) |
+| 4     | Supabase database                 | In progress (schema defined, seeding pending) |
 | 5     | Tutor onboarding and profile      | Not started |
 | 6     | Tutor discovery, search, filtering| Not started |
 | 7     | Matching engine                   | Not started |
@@ -52,20 +52,22 @@ before cutting 7.
 | 12    | Deployment                        | Not started |
 | 13    | Presentation preparation          | Not started |
 
-### Phase 4A — schema and authorisation (applied)
+### Phase 4A — schema and authorisation (implemented)
 
 Delivered in this step:
 
-- `supabase/migrations/20260103000000_initial_schema.sql`: 8 tables, 6 enums, the
-  `handle_new_user()` profile trigger, `is_admin()`, RLS on every table, and the
-  grants that keep `role` out of the account holder's reach.
-- `supabase/migrations/20260103001000_backfill_existing_profiles.sql`: one-off
-  backfill for accounts created during Phase 3.
-- `requireRole()` in `src/lib/auth/session.ts`, reading the trusted
-  `profiles.role`, with `/tutor/*` and `/admin/*` now enforcing it.
+- `TutorMatch_IB_Backend/supabase/migrations/20260103000000_initial_schema.sql`:
+  8 tables, 6 enums, the `handle_new_user()` profile trigger, `is_admin()`, RLS on
+  every table, and the grants that keep `role` out of the account holder's reach.
+- `TutorMatch_IB_Backend/supabase/migrations/20260103001000_backfill_existing_profiles.sql`:
+  one-off backfill for accounts created during Phase 3.
+- `requireRole()` in `TutorMatch_IB_Frontend/src/lib/auth/session.ts`, reading the
+  trusted `profiles.role`, with `/tutor/*` and `/admin/*` now enforcing it.
 
-Both migrations are applied to the linked remote project, and `supabase
-migration list` reports local and remote in sync.
+The migrations are intended for the linked remote project. Remote migration
+status has not been independently verified here; run `supabase migration list`
+against the target project to confirm local and remote are in sync before relying
+on the deployed role guards.
 
 Not yet done, and required before every role means something:
 
