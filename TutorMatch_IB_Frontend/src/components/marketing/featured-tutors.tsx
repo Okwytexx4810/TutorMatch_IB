@@ -4,15 +4,25 @@ import Link from "next/link";
 import { SectionHeading } from "@/components/marketing/section-heading";
 import { TutorCard } from "@/components/tutors/tutor-card";
 import { Button } from "@/components/ui/button";
-import { featuredTutors } from "@/lib/mock-data/tutors";
+import { getTutorSummaries } from "@/lib/supabase/queries/tutors";
+import { EMPTY_TUTOR_DISCOVERY_FILTERS } from "@/lib/validation/tutor-discovery";
 import { ROUTES } from "@/lib/site-config";
 
 /**
- * Sample tutors from `@/lib/mock-data/tutors`, which Phase 4 replaces with a
- * Supabase query. `TutorCard` is already typed against `TutorSummary`, so this
- * section swaps its data source and nothing else.
+ * A live slice of the discovery catalogue: the three most recently joined
+ * profiles, read through RLS with the shared discovery query. When no tutors
+ * exist yet the section hides entirely rather than showing an empty grid.
  */
-export function FeaturedTutors() {
+export async function FeaturedTutors() {
+  const result = await getTutorSummaries({
+    filters: EMPTY_TUTOR_DISCOVERY_FILTERS,
+    page: 1,
+  });
+
+  if (result.isError || result.tutors.length === 0) return null;
+
+  const featured = result.tutors.slice(0, 3);
+
   return (
     <section className="border-y bg-brand-surface">
       <div className="container-page py-16 lg:py-24">
@@ -32,18 +42,14 @@ export function FeaturedTutors() {
         </div>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredTutors.map((tutor) => (
-            <TutorCard
-              key={tutor.id}
-              tutor={tutor}
-              matchScore={tutor.matchScore}
-            />
+          {featured.map((tutor) => (
+            <TutorCard key={tutor.id} tutor={tutor} />
           ))}
         </div>
 
         <p className="mt-8 text-xs text-muted-foreground">
-          Sample profiles shown for this preview. Tutors join with their own
-          qualifications, rates and availability.
+          Live tutor profiles. Tutors join with their own subjects, qualifications
+          and availability.
         </p>
       </div>
     </section>

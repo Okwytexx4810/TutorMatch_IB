@@ -27,6 +27,11 @@ export interface TutorProfileRecord {
   id: string;
   /** Owner. Always the authenticated user; never accepted from a form. */
   profile_id: string;
+  /**
+   * Public display name. Optional; discovery falls back to `headline` when it
+   * is null. Provided by the Stage B migration; reads tolerate its absence.
+   */
+  display_name: string | null;
   headline: string | null;
   bio: string | null;
   location: string;

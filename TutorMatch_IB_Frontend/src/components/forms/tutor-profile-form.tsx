@@ -24,7 +24,10 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { initialAuthFormState } from "@/lib/auth/action-state";
+import { IBADAN_LOCATIONS, resolveIbadanLocation } from "@/lib/locations";
+import { SUBJECTS } from "@/lib/subjects";
 import { tutorProfileLimits } from "@/lib/validation/tutor-profile";
+import { EDUCATION_LEVELS, type EducationLevel } from "@/types/domain";
 
 /**
  * Tutor profile form.
@@ -39,14 +42,16 @@ import { tutorProfileLimits } from "@/lib/validation/tutor-profile";
  * attributes and the Zod bounds cannot drift apart. That module holds no
  * server-only code, so importing it from a Client Component is safe.
  *
- * Scope: this form edits the `tutor_profiles` row only. Subjects, education
- * levels, qualifications and availability are separate tables managed in later
- * milestones, so the meter below covers basic details and must not be read as
- * search readiness — see `deriveProfileCompleteness`.
+ * Scope: this form edits the `tutor_profiles` row plus the tutor's offerings in
+ * `tutor_subjects` (subjects and levels). Qualifications and availability are
+ * separate tables still managed in later milestones, so the meter below covers
+ * basic details and must not be read as full search readiness — see
+ * `deriveProfileCompleteness`.
  */
 
 /** The subset of the stored row this form needs. Kept explicit to stay serialisable. */
 export interface TutorProfileFormValues {
+  display_name: string | null;
   headline: string | null;
   bio: string | null;
   location: string;
@@ -54,7 +59,15 @@ export interface TutorProfileFormValues {
   years_of_experience: number;
   is_verified: boolean;
   profile_completeness: number;
+  subjects: string[];
+  levels: EducationLevel[];
 }
+
+const SELECT_CLASS =
+  "h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+
+const MULTI_SELECT_CLASS =
+  "min-h-40 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function TutorProfileForm({
   profile,
@@ -70,9 +83,20 @@ export function TutorProfileForm({
   const errors = state.fieldErrors ?? {};
   const isNew = profile === null;
 
+  // The saved location only preselects the dropdown when it is already one of
+  // the approved areas. A legacy or free-text value (e.g. "Porthacourt") resolves
+  // to null, so the tutor is asked to choose an approved location.
+  const currentLocation = profile ? resolveIbadanLocation(profile.location) : null;
+
   // The stored value, which the server derives. Not a live count of what is in
   // the form: it refreshes on save, not on every keystroke.
   const completeness = isNew ? 50 : profile.profile_completeness;
+
+  // The curated vocabulary plus any subject the tutor already has saved, so a
+  // custom subject they picked earlier is never silently dropped from the list.
+  const subjectOptions = Array.from(
+    new Set<string>([...SUBJECTS, ...(profile?.subjects ?? [])]),
+  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <form action={formAction} className="grid gap-6" noValidate>
@@ -82,7 +106,7 @@ export function TutorProfileForm({
         {isNew ? (
           <FieldDescription className="rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 text-sm">
             You have not created a tutor profile yet. Add the details below to get
-            started. You will add the subjects and levels you teach next, and
+            started. Your subjects and levels are saved with your profile, and
             students find tutors through those.
           </FieldDescription>
         ) : null}
@@ -95,6 +119,25 @@ export function TutorProfileForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-5">
+            <Field data-invalid={Boolean(errors.displayName?.[0])}>
+              <FieldLabel htmlFor="displayName">Display name</FieldLabel>
+              <Input
+                id="displayName"
+                name="displayName"
+                defaultValue={profile?.display_name ?? ""}
+                maxLength={tutorProfileLimits.displayName}
+                placeholder="Mr. Adeyemi"
+                aria-invalid={Boolean(errors.displayName?.[0])}
+              />
+              <FieldDescription>
+                The name students see in search results. Optional — without it,
+                your headline is shown instead.
+              </FieldDescription>
+              {errors.displayName?.[0] ? (
+                <FieldError>{errors.displayName[0]}</FieldError>
+              ) : null}
+            </Field>
+
             <Field data-invalid={Boolean(errors.headline?.[0])}>
               <FieldLabel htmlFor="headline">Headline</FieldLabel>
               <Input
@@ -141,18 +184,29 @@ export function TutorProfileForm({
           </CardHeader>
           <CardContent className="grid gap-5">
             <Field data-invalid={Boolean(errors.location?.[0])}>
-              <FieldLabel htmlFor="location">Location</FieldLabel>
-              <Input
+              <FieldLabel htmlFor="location">Teaching location</FieldLabel>
+              <select
                 id="location"
                 name="location"
-                defaultValue={profile?.location ?? ""}
-                maxLength={tutorProfileLimits.location}
-                placeholder="Lekki, Lagos"
                 required
+                defaultValue={currentLocation ?? ""}
                 aria-invalid={Boolean(errors.location?.[0])}
-              />
+                className={SELECT_CLASS}
+              >
+                <option value="" disabled>
+                  Select your area
+                </option>
+                {IBADAN_LOCATIONS.map((location) => (
+                  <option key={location} value={location}>
+                    {location}
+                  </option>
+                ))}
+              </select>
               <FieldDescription>
-                The area or town where you teach or meet students.
+                Choose the approved Ibadan area where you teach or meet students.
+                {profile && currentLocation === null
+                  ? " Your current saved location is not on the approved list — please choose one."
+                  : ""}
               </FieldDescription>
               {errors.location?.[0] ? (
                 <FieldError>{errors.location[0]}</FieldError>
@@ -205,6 +259,67 @@ export function TutorProfileForm({
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Subjects and levels you teach</CardTitle>
+            <CardDescription>
+              Students find you through these, so pick every subject and level
+              you can help with.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5">
+            <Field data-invalid={Boolean(errors.subjects?.[0])}>
+              <FieldLabel htmlFor="subjects">Subjects</FieldLabel>
+              <select
+                id="subjects"
+                name="subjects"
+                multiple
+                size={10}
+                defaultValue={profile?.subjects ?? []}
+                aria-invalid={Boolean(errors.subjects?.[0])}
+                className={MULTI_SELECT_CLASS}
+              >
+                {subjectOptions.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {subject}
+                  </option>
+                ))}
+              </select>
+              <FieldDescription>
+                Hold Ctrl (or Cmd on a Mac) to choose more than one subject.
+              </FieldDescription>
+              {errors.subjects?.[0] ? (
+                <FieldError>{errors.subjects[0]}</FieldError>
+              ) : null}
+            </Field>
+
+            <Field data-invalid={Boolean(errors.levels?.[0])}>
+              <FieldLabel htmlFor="levels">Levels</FieldLabel>
+              <select
+                id="levels"
+                name="levels"
+                multiple
+                size={6}
+                defaultValue={profile?.levels ?? []}
+                aria-invalid={Boolean(errors.levels?.[0])}
+                className={MULTI_SELECT_CLASS}
+              >
+                {EDUCATION_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+              <FieldDescription>
+                Hold Ctrl (or Cmd on a Mac) to choose more than one level.
+              </FieldDescription>
+              {errors.levels?.[0] ? (
+                <FieldError>{errors.levels[0]}</FieldError>
+              ) : null}
+            </Field>
+          </CardContent>
+        </Card>
+
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium">Basic details complete</span>
@@ -225,8 +340,8 @@ export function TutorProfileForm({
             ) : (
               <span className="inline-flex items-center gap-1">
                 <Sparkles className="size-4" aria-hidden="true" />
-                This covers your basic details only. Subjects and levels are
-                required for tutor discovery and will be added in the next step.
+                This covers your basic details only. Your subjects and levels are
+                saved alongside them and are what students search on.
               </span>
             )}
           </FieldDescription>

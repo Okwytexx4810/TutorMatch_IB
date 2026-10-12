@@ -1,3 +1,4 @@
+import { Globe, Mail, Phone } from "lucide-react";
 import Link from "next/link";
 
 import { Logo } from "@/components/layout/logo";
@@ -11,6 +12,15 @@ const footerSections = [
       { href: ROUTES.findTutors, label: "Find Tutors" },
       { href: "/#how-it-works", label: "How It Works" },
       { href: "/#for-tutors", label: "For Tutors" },
+    ],
+  },
+  {
+    title: "Get Started",
+    links: [
+      { href: ROUTES.register, label: "Create Account" },
+      { href: ROUTES.login, label: "Sign In" },
+      { href: ROUTES.dashboard, label: "Student Area" },
+      { href: ROUTES.tutorDashboard, label: "Tutor Area" },
     ],
   },
   {
@@ -35,20 +45,45 @@ const linkClass =
 export function SiteFooter() {
   return (
     <footer className="border-t bg-background">
-      <div className="container-page grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-6">
-        <div className="md:col-span-2 lg:col-span-3">
+      <div className="container-page grid gap-10 py-14 md:grid-cols-2 lg:grid-cols-12">
+        <div className="max-w-sm space-y-5 lg:col-span-4">
           <Logo />
-          <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {siteConfig.description}
           </p>
-          <Button size="sm" variant="outline" className="mt-6" asChild>
+          <div className="flex flex-col gap-2.5 text-sm text-muted-foreground">
+            <a
+              href={`mailto:${siteConfig.contactEmail}`}
+              className="inline-flex w-fit items-center gap-2 transition-colors hover:text-foreground"
+            >
+              <Mail className="size-4 shrink-0" aria-hidden="true" />
+              {siteConfig.contactEmail}
+            </a>
+            <a
+              href={`tel:${siteConfig.contactPhone.replace(/[^+\d]/g, "")}`}
+              className="inline-flex w-fit items-center gap-2 transition-colors hover:text-foreground"
+            >
+              <Phone className="size-4 shrink-0" aria-hidden="true" />
+              {siteConfig.contactPhone}
+            </a>
+            <a
+              href={siteConfig.url}
+              className="inline-flex w-fit items-center gap-2 transition-colors hover:text-foreground"
+            >
+              <Globe className="size-4 shrink-0" aria-hidden="true" />
+              {siteConfig.url.replace(/^https?:\/\//, "")}
+            </a>
+          </div>
+          <Button size="sm" variant="outline" asChild>
             <Link href={ROUTES.findTutors}>Find a tutor</Link>
           </Button>
         </div>
 
         {footerSections.map((section) => (
-          <nav key={section.title} aria-label={section.title}>
-            <h2 className="text-sm font-semibold">{section.title}</h2>
+          <nav key={section.title} aria-label={section.title} className="lg:col-span-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide">
+              {section.title}
+            </h2>
             <ul className="mt-4 space-y-2.5">
               {section.links.map((link) => (
                 <li key={link.href}>
@@ -65,14 +100,18 @@ export function SiteFooter() {
       <div className="border-t">
         <div className="container-page flex flex-col gap-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>
-            &copy; {new Date().getFullYear()} {siteConfig.name}
+            &copy; {new Date().getFullYear()} {siteConfig.name}. Built for
+            learners in Ibadan.
           </p>
           <nav aria-label="Footer utility" className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href={ROUTES.contact} className={linkClass}>
-              {siteConfig.contactEmail}
+            <Link href={ROUTES.privacy} className={linkClass}>
+              Privacy
             </Link>
-            <Link href="/#how-it-works" className={linkClass}>
-              How matching works
+            <Link href={ROUTES.terms} className={linkClass}>
+              Terms
+            </Link>
+            <Link href={ROUTES.contact} className={linkClass}>
+              Contact
             </Link>
           </nav>
         </div>

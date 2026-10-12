@@ -1,6 +1,7 @@
 import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { promoteConfiguredAdmin } from "@/lib/auth/admin";
 import { homeForRole } from "@/lib/auth/roles";
 import { readTrustedRole } from "@/lib/auth/session";
 import { ROUTES } from "@/lib/site-config";
@@ -94,6 +95,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (error || !data.user) {
     return failure("expired");
   }
+
+  // Bootstrap an allow-listed administrator before choosing the destination, so
+  // the fresh admin is routed to /admin rather than a student dashboard.
+  await promoteConfiguredAdmin(data.user.id, data.user.email);
 
   // Default destination follows the database role. `next` still wins when it is
   // present, and `isSafeNextPath` has already rejected anything off-site.

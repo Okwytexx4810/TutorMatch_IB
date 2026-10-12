@@ -1,6 +1,7 @@
 import { getProfile } from "@/lib/auth/session";
 import { getServerSupabase } from "@/lib/supabase/server";
-import type { TutorProfileRecord, UserProfile } from "@/types/domain";
+import { isMissingColumnError } from "@/lib/supabase/compat";
+import type { EducationLevel, TutorProfileRecord, UserProfile } from "@/types/domain";
 
 /**
  * Read helpers for the tutor profile domain.
@@ -24,6 +25,9 @@ import type { TutorProfileRecord, UserProfile } from "@/types/domain";
  * show verification state. It is not writable by any client.
  */
 const TUTOR_PROFILE_COLUMNS =
+  "id, profile_id, display_name, headline, bio, location, hourly_rate, years_of_experience, is_verified, profile_completeness, created_at, updated_at";
+
+const TUTOR_PROFILE_COLUMNS_BASE =
   "id, profile_id, headline, bio, location, hourly_rate, years_of_experience, is_verified, profile_completeness, created_at, updated_at";
 
 /**
@@ -54,12 +58,67 @@ export async function getCurrentTutorProfile(): Promise<TutorProfileRecord | nul
   if (!profile) return null;
 
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase
+
+  const read = (columns: string) =>
+    supabase
+      .from("tutor_profiles")
+      .select(columns)
+      .eq("profile_id", profile.id)
+      .maybeSingle();
+
+  let result = await read(TUTOR_PROFILE_COLUMNS);
+
+  // Pre-migration environments have no `display_name` column. Fall back so an
+  // existing tutor profile is still found rather than reported as missing.
+  if (result.error && isMissingColumnError(result.error, "display_name")) {
+    result = await read(TUTOR_PROFILE_COLUMNS_BASE);
+  }
+
+  if (result.error || !result.data) return null;
+  // Cast through `unknown`: the union of the two possible column-result shapes
+  // does not directly overlap with `TutorProfileRecord`. The column lists above
+  // are the asserted contract.
+  return result.data as unknown as TutorProfileRecord;
+}
+
+/** The signed-in tutor's offerings, split into the two form selects. */
+export interface CurrentTutorOfferings {
+  subjects: string[];
+  levels: EducationLevel[];
+}
+
+/**
+ * Distinct subjects and levels the signed-in tutor has listed in
+ * `tutor_subjects`, for preselecting the profile form's multi-selects. Returns
+ * empty lists — not an error — when the tutor has no offerings yet.
+ */
+export async function getCurrentTutorOfferings(): Promise<CurrentTutorOfferings> {
+  const profile = await getProfile();
+  if (!profile) return { subjects: [], levels: [] };
+
+  const supabase = await getServerSupabase();
+
+  const tutor = await supabase
     .from("tutor_profiles")
-    .select(TUTOR_PROFILE_COLUMNS)
+    .select("id")
     .eq("profile_id", profile.id)
     .maybeSingle();
 
-  if (error || !data) return null;
-  return data as TutorProfileRecord;
+  const tutorId = (tutor.data as { id: string } | null | undefined)?.id;
+  if (tutor.error || !tutorId) return { subjects: [], levels: [] };
+
+  const result = await supabase
+    .from("tutor_subjects")
+    .select("subject, level")
+    .eq("tutor_id", tutorId);
+
+  if (result.error) return { subjects: [], levels: [] };
+
+  const rows =
+    (result.data as { subject: string; level: EducationLevel }[] | null | undefined) ?? [];
+
+  return {
+    subjects: Array.from(new Set(rows.map((row) => row.subject))),
+    levels: Array.from(new Set(rows.map((row) => row.level))),
+  };
 }

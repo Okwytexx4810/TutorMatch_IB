@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { DemoGallery } from "@/components/marketing/demo-gallery";
 import { FeaturedTutors } from "@/components/marketing/featured-tutors";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { ForTutors } from "@/components/marketing/for-tutors";
@@ -20,13 +21,16 @@ export const metadata: Metadata = {
 /**
  * Public landing page.
  *
- * Server Components only. Section order alternates surface tones for rhythm:
- * hero (tinted) -> search (white) -> stats (navy) -> steps (white) ->
- * featured (tinted) -> why (white) -> for tutors (tinted) -> final CTA (navy).
+ * Server Components only. The galleries sit first so the photos are visible
+ * directly under the header. Section order alternates surface tones for rhythm:
+ * gallery (white) -> hero (tinted) -> search (white) -> stats (navy) ->
+ * steps (white) -> featured (tinted) -> why (white) -> for tutors (tinted)
+ * -> final CTA (navy).
  */
 export default function HomePage() {
   return (
     <>
+      <DemoGallery />
       <Hero />
       <TutorRequestSearch />
       <PlatformStats />

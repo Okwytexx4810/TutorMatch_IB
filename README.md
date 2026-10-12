@@ -161,12 +161,17 @@ registration, the emailed confirmation link returning through `/auth/callback`,
 sign-in routing to `/dashboard`, and a student being redirected away from both
 `/tutor/dashboard` and `/admin`.
 
-**Not yet verified:** the parent, tutor and admin authentication paths have not
-been individually tested. No administrator account exists yet, so `/admin` cannot
-be exercised until one is granted by hand.
+**Not yet verified:** the parent and tutor authentication paths have not been
+individually tested. The admin area needs the admin-console migration applied and
+an `ADMIN_EMAILS` entry before an administrator account is bootstrapped (see
+`src/lib/auth/admin.ts`); no such account exists in the linked project yet.
 
-The matching engine, tutor discovery, booking workflow and OpenAI integration are
-deliberately not implemented yet.
+Tutor discovery, tutor profiles, requests, bookings and the admin console are
+implemented in code. They depend on the Stage B, Stage C, Stage C1 and
+admin-console migrations, which are prepared in
+[`TutorMatch_IB_Backend/supabase/migrations`](TutorMatch_IB_Backend/supabase/migrations)
+but **not yet applied** to the linked project. The matching engine (Phase 7) and
+OpenAI integration (Phase 8) are not implemented yet.
 
 ### Applying the database
 

@@ -11,6 +11,7 @@ import {
   authSuccess,
   type AuthFormState,
 } from "@/lib/auth/action-state";
+import { promoteConfiguredAdmin } from "@/lib/auth/admin";
 import { authErrorMessage } from "@/lib/auth/errors";
 import { homeForRole } from "@/lib/auth/roles";
 import { getRole, readTrustedRole, requireUser } from "@/lib/auth/session";
@@ -111,6 +112,11 @@ export async function signInAction(
     return authFailure(authErrorMessage(error, "signIn"));
   }
 
+  // Bootstrap the first administrator: an account on the server-side
+  // ADMIN_EMAILS allow-list is promoted before the destination is chosen, so it
+  // routes straight to /admin. A no-op for everyone else.
+  await promoteConfiguredAdmin(data.user.id, data.user.email);
+
   const next = safeNextPath(formData.get("next"));
   // The role comes from `profiles`, so a tampered metadata claim cannot steer
   // the destination. The session is in memory only at this point, so the live
@@ -165,6 +171,10 @@ export async function signUpAction(
   if (!data.session || !data.user) {
     return authSuccess("Check your inbox to confirm your email, then sign in.");
   }
+
+  // Same bootstrap as sign-in, so an allow-listed account that registers (with
+  // confirmations off) becomes admin immediately.
+  await promoteConfiguredAdmin(data.user.id, data.user.email);
 
   revalidatePath("/", "layout");
   redirect(homeForRole(await readTrustedRole(supabase, data.user.id)));

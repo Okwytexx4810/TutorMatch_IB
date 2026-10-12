@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import { resolveIbadanLocation, type IbadanLocation } from "@/lib/locations";
+import { SUBJECT_MAX } from "@/lib/subjects";
+import { EDUCATION_LEVELS } from "@/types/domain";
+
 /**
  * Zod schema for the tutor profile form.
  *
@@ -30,7 +34,8 @@ import { z } from "zod";
 const HEADLINE_MAX = 140;
 /** No database limit; a deliberate product bound so a profile stays readable. */
 const BIO_MAX = 2000;
-const LOCATION_MAX = 120;
+/** Product bound on the public display name. */
+const DISPLAY_NAME_MAX = 80;
 /** Whole naira. The migration stores an integer precisely to avoid float money. */
 const HOURLY_RATE_MAX = 1_000_000;
 /** `smallint` in the database, bounded to something a person can claim. */
@@ -39,7 +44,7 @@ const YEARS_MAX = 80;
 export const tutorProfileLimits = {
   headline: HEADLINE_MAX,
   bio: BIO_MAX,
-  location: LOCATION_MAX,
+  displayName: DISPLAY_NAME_MAX,
 } as const;
 
 /**
@@ -57,6 +62,11 @@ function optionalText(max: number, message: string) {
 }
 
 export const tutorProfileSchema = z.strictObject({
+  displayName: optionalText(
+    DISPLAY_NAME_MAX,
+    `Keep your display name under ${DISPLAY_NAME_MAX} characters.`,
+  ),
+
   headline: optionalText(
     HEADLINE_MAX,
     `Keep your headline under ${HEADLINE_MAX} characters.`,
@@ -64,11 +74,19 @@ export const tutorProfileSchema = z.strictObject({
 
   bio: optionalText(BIO_MAX, `Keep your bio under ${BIO_MAX} characters.`),
 
+  /**
+   * Restricted to the 26 approved Ibadan locations. The value is resolved to
+   * its canonical spelling, so `"bodija"` is stored as `"Bodija"`. Unsupported
+   * values are rejected here rather than reaching the database; the Stage B
+   * migration adds a matching CHECK constraint as a second line of defence.
+   */
   location: z
     .string()
     .trim()
-    .min(2, "Enter the area or town you teach in.")
-    .max(LOCATION_MAX, `Keep your location under ${LOCATION_MAX} characters.`),
+    .transform((value) => resolveIbadanLocation(value))
+    .refine((value): value is IbadanLocation => value !== null, {
+      message: "Select one of the approved Ibadan locations.",
+    }),
 
   hourlyRate: z.coerce
     .number({ error: "Enter your hourly rate as a number." })
@@ -81,6 +99,32 @@ export const tutorProfileSchema = z.strictObject({
     .int("Use whole years, with no decimals.")
     .min(0, "Experience cannot be negative.")
     .max(YEARS_MAX, `Enter ${YEARS_MAX} years or fewer.`),
+
+  /**
+   * The subjects and levels the tutor teaches, written to `tutor_subjects`.
+   *
+   * These make a saved profile genuinely bookable: discovery and the request
+   * form both read offerings, and the Stage C1 request-insert policy only
+   * accepts a request whose subject and level match one of them. Requiring at
+   * least one of each is what stops a "saved" profile from being invisible.
+   * Subjects are free text (capped) so a tutor's existing custom subjects are
+   * never silently dropped; both lists are de-duplicated after trimming.
+   */
+  subjects: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, "Choose a subject.")
+        .max(SUBJECT_MAX, `Keep each subject under ${SUBJECT_MAX} characters.`),
+    )
+    .min(1, "Choose at least one subject you teach.")
+    .transform((values) => Array.from(new Set(values))),
+
+  levels: z
+    .array(z.enum(EDUCATION_LEVELS, { error: "Choose an education level." }))
+    .min(1, "Choose at least one level you teach.")
+    .transform((values) => Array.from(new Set(values))),
 });
 
 export type TutorProfileInput = z.infer<typeof tutorProfileSchema>;

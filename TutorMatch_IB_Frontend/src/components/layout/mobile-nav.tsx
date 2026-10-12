@@ -2,9 +2,12 @@
 
 import { Menu } from "lucide-react";
 import Link from "next/link";
+import type { Route } from "next";
 
 import { Logo } from "@/components/layout/logo";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { SignOutButton } from "@/components/forms/sign-out-button";
 import {
   Sheet,
   SheetClose,
@@ -17,14 +20,31 @@ import {
 } from "@/components/ui/sheet";
 import { publicNavLinks, ROUTES } from "@/lib/site-config";
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
 /**
  * Mobile navigation drawer.
  *
  * The one interactive island in the public header, so `SiteHeader` can stay a
  * Server Component. Radix handles focus trapping, escape-to-close and restoring
  * focus on the trigger; every link closes the sheet on activation.
+ *
+ * When `account` is present the footer shows the signed-in visitor's avatar
+ * (linking to their profile) and a sign-out control instead of the anonymous
+ * Log in / Get started buttons.
  */
-export function MobileNav() {
+export function MobileNav({
+  account,
+}: {
+  account?: { name: string; profileHref: Route } | null;
+}) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -62,16 +82,34 @@ export function MobileNav() {
         </nav>
 
         <SheetFooter className="gap-2.5 border-t p-4">
-          <Button variant="outline" className="h-10 w-full" asChild>
-            <SheetClose asChild>
-              <Link href={ROUTES.login}>Log in</Link>
-            </SheetClose>
-          </Button>
-          <Button className="h-10 w-full" asChild>
-            <SheetClose asChild>
-              <Link href={ROUTES.register}>Get started</Link>
-            </SheetClose>
-          </Button>
+          {account ? (
+            <>
+              <Button variant="outline" className="h-10 w-full justify-start" asChild>
+                <SheetClose asChild>
+                  <Link href={account.profileHref} className="flex items-center gap-2">
+                    <Avatar size="sm">
+                      <AvatarFallback>{initialsOf(account.name)}</AvatarFallback>
+                    </Avatar>
+                    {account.name}
+                  </Link>
+                </SheetClose>
+              </Button>
+              <SignOutButton />
+            </>
+          ) : (
+            <>
+              <Button variant="outline" className="h-10 w-full" asChild>
+                <SheetClose asChild>
+                  <Link href={ROUTES.login}>Log in</Link>
+                </SheetClose>
+              </Button>
+              <Button className="h-10 w-full" asChild>
+                <SheetClose asChild>
+                  <Link href={ROUTES.register}>Get started</Link>
+                </SheetClose>
+              </Button>
+            </>
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

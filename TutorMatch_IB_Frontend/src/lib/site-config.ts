@@ -11,6 +11,7 @@ export const siteConfig = {
   url:
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3001",
   contactEmail: "support@tutormatch.ng",
+  contactPhone: "+23437100923",
 } as const;
 
 export const ROUTES = {
@@ -33,6 +34,10 @@ export const ROUTES = {
   tutorRequests: "/tutor/requests",
   tutorBookings: "/tutor/bookings",
   admin: "/admin",
+  adminRequests: "/admin/requests",
+  adminTutors: "/admin/tutors",
+  adminUsers: "/admin/users",
+  adminBookings: "/admin/bookings",
   about: "/about",
   contact: "/contact",
   privacy: "/privacy",
@@ -44,4 +49,6 @@ export const publicNavLinks = [
   { href: ROUTES.findTutors, label: "Find Tutors" },
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/#for-tutors", label: "For Tutors" },
+  { href: ROUTES.about, label: "About" },
+  { href: ROUTES.contact, label: "Contact" },
 ] as const;

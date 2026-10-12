@@ -8,8 +8,16 @@ import {
   type AuthFormState,
 } from "@/lib/auth/action-state";
 import { requireRole } from "@/lib/auth/session";
+import { saveCurrentTutorAvailability } from "@/lib/supabase/mutations/availability";
+import {
+  changeBookingStatus,
+  scheduleBookingFromRequest,
+} from "@/lib/supabase/mutations/bookings";
+import { respondToRequestAsTutor } from "@/lib/supabase/mutations/requests";
 import { saveCurrentTutorProfile } from "@/lib/supabase/mutations/tutor-profile";
 import { ROUTES } from "@/lib/site-config";
+import { tutorAvailabilitySchema } from "@/lib/validation/availability";
+import { bookingWindowSchema } from "@/lib/validation/engagement";
 import { tutorProfileSchema } from "@/lib/validation/tutor-profile";
 
 /**
@@ -37,6 +45,20 @@ import { tutorProfileSchema } from "@/lib/validation/tutor-profile";
 function field(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
+}
+
+/**
+ * Read every value of a repeated form field (a multi-select) as trimmed strings.
+ *
+ * Non-string entries (a file input submitted under the same name) are dropped
+ * rather than stringified, so the schema only ever sees text.
+ */
+function fieldList(formData: FormData, name: string): string[] {
+  return formData
+    .getAll(name)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
 }
 
 /**
@@ -98,11 +120,14 @@ export async function saveTutorProfileAction(
   await requireRole(["tutor"], ROUTES.tutorProfileSettings);
 
   const parsed = tutorProfileSchema.safeParse({
+    displayName: field(formData, "displayName"),
     headline: field(formData, "headline"),
     bio: field(formData, "bio"),
     location: field(formData, "location"),
     hourlyRate: field(formData, "hourlyRate"),
     yearsOfExperience: field(formData, "yearsOfExperience"),
+    subjects: fieldList(formData, "subjects"),
+    levels: fieldList(formData, "levels"),
   });
 
   if (!parsed.success) {
@@ -122,4 +147,141 @@ export async function saveTutorProfileAction(
   revalidatePath(ROUTES.tutorProfileSettings);
 
   return authSuccess("Your tutor profile is saved.");
+}
+
+// ============================================================================
+// Request and booking actions
+// ============================================================================
+
+/** Accept or decline a request addressed to the signed-in tutor. */
+export async function respondToRequestAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  await requireRole(["tutor"], ROUTES.tutorRequests);
+
+  const intent = field(formData, "intent");
+  if (intent !== "accept" && intent !== "decline") {
+    return authFailure("We could not tell how you wanted to respond.");
+  }
+
+  const requestId = field(formData, "requestId");
+  if (!requestId) return authFailure("We could not identify that request.");
+
+  const result = await respondToRequestAsTutor(
+    requestId,
+    intent === "accept" ? "accepted" : "declined",
+  );
+
+  if (!result.ok) return authFailure(result.message);
+
+  revalidatePath(ROUTES.tutorRequests);
+
+  return intent === "accept"
+    ? authSuccess("Request accepted. You can now schedule a session.")
+    : authSuccess("Request declined.");
+}
+
+/** Schedule a session for an accepted request, from the tutor's inbox. */
+export async function scheduleTutorBookingAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  await requireRole(["tutor"], ROUTES.tutorBookings);
+
+  const requestId = field(formData, "requestId");
+  if (!requestId) return authFailure("We could not identify that request.");
+
+  const parsedWindow = bookingWindowSchema().safeParse({
+    startsAt: field(formData, "startsAt"),
+    endsAt: field(formData, "endsAt"),
+  });
+
+  if (!parsedWindow.success) {
+    return authFailure(
+      "Check the session start and end times.",
+      fieldErrorsFrom(parsedWindow.error),
+    );
+  }
+
+  const result = await scheduleBookingFromRequest(
+    requestId,
+    parsedWindow.data.startsAt,
+    parsedWindow.data.endsAt,
+  );
+
+  if (!result.ok) return authFailure(result.message);
+
+  revalidatePath(ROUTES.tutorBookings);
+  revalidatePath(ROUTES.tutorRequests);
+  return authSuccess("Session booked. It now appears under your sessions.");
+}
+
+/** Cancel or complete a confirmed booking, from the tutor's sessions list. */
+export async function updateTutorBookingStatusAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  await requireRole(["tutor"], ROUTES.tutorBookings);
+
+  const intent = field(formData, "intent");
+  if (intent !== "cancel" && intent !== "complete") {
+    return authFailure("We could not tell what you wanted to do.");
+  }
+
+  const bookingId = field(formData, "bookingId");
+  if (!bookingId) return authFailure("We could not identify that booking.");
+
+  const result = await changeBookingStatus(
+    bookingId,
+    intent === "complete" ? "completed" : "cancelled",
+    "tutor",
+  );
+
+  if (!result.ok) return authFailure(result.message);
+
+  revalidatePath(ROUTES.tutorBookings);
+  return intent === "complete"
+    ? authSuccess("Session marked as completed.")
+    : authSuccess("That session was cancelled.");
+}
+
+// ============================================================================
+// Availability
+// ============================================================================
+
+/**
+ * Save the signed-in tutor's weekly availability.
+ *
+ * The form submits one repeated `slot` value per ticked cell, encoded as
+ * `day|period`. Each value is split, then the whole set is validated against
+ * the same `WEEK_DAYS`/`DAY_PERIODS` vocabulary the table constraint uses, so a
+ * crafted value cannot reach the database.
+ */
+export async function saveTutorAvailabilityAction(
+  _previous: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  await requireRole(["tutor"], ROUTES.tutorAvailability);
+
+  const slots = fieldList(formData, "slot").map((value) => {
+    const [day, period] = value.split("|");
+    return { day, period };
+  });
+
+  const parsed = tutorAvailabilitySchema.safeParse({ slots });
+
+  if (!parsed.success) {
+    return authFailure(
+      "Check the days and times you selected.",
+      fieldErrorsFrom(parsed.error),
+    );
+  }
+
+  const result = await saveCurrentTutorAvailability(parsed.data.slots);
+
+  if (!result.ok) return authFailure(result.message);
+
+  revalidatePath(ROUTES.tutorAvailability);
+  return authSuccess("Your availability is saved.");
 }

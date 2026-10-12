@@ -1,10 +1,12 @@
 import {
   CalendarClock,
   CalendarDays,
+  GraduationCap,
   Inbox,
   LayoutDashboard,
   Search,
   UserRound,
+  Users,
 } from "lucide-react";
 
 import type { NavItem } from "@/components/dashboard/dashboard-sidebar";
@@ -34,11 +36,14 @@ export const tutorNavItems: readonly NavItem[] = [
 ];
 
 /**
- * Admin navigation. Phase 10 adds the tutors / students / requests sub-routes;
- * until those routes exist they must not be linked, because `typedRoutes`
- * rejects links to routes that are not in the build.
+ * Admin navigation. Applications are the primary queue; sessions, tutor and
+ * user directories sit alongside it.
  */
 export const adminNavItems: readonly NavItem[] = [
   { href: ROUTES.admin, label: "Overview", icon: LayoutDashboard },
+  { href: ROUTES.adminRequests, label: "Applications", icon: Inbox },
+  { href: ROUTES.adminBookings, label: "Sessions", icon: CalendarDays },
+  { href: ROUTES.adminTutors, label: "Tutors", icon: GraduationCap },
+  { href: ROUTES.adminUsers, label: "Users", icon: Users },
 ];
 

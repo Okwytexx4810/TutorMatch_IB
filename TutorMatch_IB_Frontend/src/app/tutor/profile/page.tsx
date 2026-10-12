@@ -5,7 +5,10 @@ import {
   TutorProfileForm,
   type TutorProfileFormValues,
 } from "@/components/forms/tutor-profile-form";
-import { getCurrentTutorProfile } from "@/lib/supabase/queries/tutor-profile";
+import {
+  getCurrentTutorOfferings,
+  getCurrentTutorProfile,
+} from "@/lib/supabase/queries/tutor-profile";
 
 export const metadata: Metadata = {
   title: "Tutor profile",
@@ -24,17 +27,23 @@ export const metadata: Metadata = {
  * layout, so a profile read here always has an authenticated owner. No
  * ownership check is repeated in this file.
  *
- * Subjects and qualifications are not edited here. They live in their own
- * tables, are scoped per subject and level, and are a separate milestone; this
- * page deliberately covers the `tutor_profiles` row only.
+ * The subjects and levels shown here are the tutor's offerings in
+ * `tutor_subjects`; saving the form reconciles that table alongside the
+ * `tutor_profiles` row, which is what makes a saved profile visible in
+ * discovery and bookable. Qualifications and availability are still separate
+ * milestones and are not edited here.
  */
 export default async function TutorProfileSettingsPage() {
-  const profile = await getCurrentTutorProfile();
+  const [profile, offerings] = await Promise.all([
+    getCurrentTutorProfile(),
+    getCurrentTutorOfferings(),
+  ]);
 
   // Narrowed to the fields the form renders, so nothing extra crosses the
   // server/client boundary.
   const values: TutorProfileFormValues | null = profile
     ? {
+        display_name: profile.display_name,
         headline: profile.headline,
         bio: profile.bio,
         location: profile.location,
@@ -42,6 +51,8 @@ export default async function TutorProfileSettingsPage() {
         years_of_experience: profile.years_of_experience,
         is_verified: profile.is_verified,
         profile_completeness: profile.profile_completeness,
+        subjects: offerings.subjects,
+        levels: offerings.levels,
       }
     : null;
 
