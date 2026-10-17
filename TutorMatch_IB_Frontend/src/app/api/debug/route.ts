@@ -18,18 +18,31 @@ export async function GET(request: Request): Promise<Response> {
     projectRef = null;
   }
 
-  const hasPublishable = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  );
+  const publishableKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? null;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? null;
 
   const out: Record<string, unknown> = {
     supabaseUrl,
     projectRef,
-    hasPublishableKey: hasPublishable,
+    hasPublishableKey: Boolean(publishableKey),
+    publishableKeyPrefix: publishableKey ? publishableKey.slice(0, 16) : null,
     hasServiceRoleKey: Boolean(serviceKey),
     adminEmails: process.env.ADMIN_EMAILS ?? null,
   };
+
+  if (supabaseUrl && publishableKey) {
+    try {
+      const res = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+        headers: { apikey: publishableKey },
+        cache: "no-store",
+      });
+      out.publishableKeyStatus = res.status;
+      out.publishableKeyValid = res.ok;
+    } catch (error) {
+      out.publishableKeyError = String(error).slice(0, 200);
+    }
+  }
 
   if (supabaseUrl && serviceKey) {
     try {
