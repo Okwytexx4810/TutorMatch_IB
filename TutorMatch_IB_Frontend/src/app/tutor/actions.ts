@@ -176,6 +176,8 @@ export async function respondToRequestAction(
   if (!result.ok) return authFailure(result.message);
 
   revalidatePath(ROUTES.tutorRequests);
+  revalidatePath(ROUTES.tutorDashboard);
+  revalidatePath(ROUTES.dashboardRequests);
 
   return intent === "accept"
     ? authSuccess("Request accepted. You can now schedule a session.")

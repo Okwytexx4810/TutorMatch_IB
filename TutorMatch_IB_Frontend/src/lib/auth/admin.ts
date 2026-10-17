@@ -41,10 +41,10 @@ export function isConfiguredAdminEmail(
 /**
  * Promote an account to `admin` when its email is on the allow-list.
  *
- * Server-only. Returns `true` only when a promotion actually happened, so the
- * caller can revalidate. Idempotent: an account already carrying the `admin`
- * role is left untouched (the `neq` filter narrows the update to nothing), and
- * an unconfigured service key is a no-op rather than an error.
+ * Server-only. Returns `true` when the account is an administrator afterwards.
+ * Creates the `profiles` row when Auth has a user but the signup trigger never
+ * ran. An unconfigured service key returns `false` so sign-in can say why
+ * `/admin` is still closed.
  *
  * @param userId The authenticated user id, from Supabase Auth (not the payload).
  * @param email The authenticated user's email.
@@ -53,16 +53,39 @@ export async function promoteConfiguredAdmin(
   userId: string,
   email: string | null | undefined,
 ): Promise<boolean> {
-  if (!isConfiguredAdminEmail(email)) return false;
+  if (!isConfiguredAdminEmail(email) || !email) return false;
 
   const service = getServiceSupabase();
   if (!service) return false;
 
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data: existing, error: readError } = await service
+    .from("profiles")
+    .select("id, role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (readError) return false;
+
+  // An Auth user created in the Supabase dashboard can exist without a
+  // `profiles` row (the signup trigger never ran). Update-only promotion
+  // then changes nothing and the account stays locked out of /admin.
+  if (!existing) {
+    const { error } = await service.from("profiles").insert({
+      id: userId,
+      email: normalizedEmail,
+      full_name: normalizedEmail.split("@")[0] || "Admin",
+      role: "admin",
+    });
+    return !error;
+  }
+
+  if ((existing as { role?: string }).role === "admin") return true;
+
   const { error } = await service
     .from("profiles")
     .update({ role: "admin" })
-    .eq("id", userId)
-    .neq("role", "admin");
+    .eq("id", userId);
 
   return !error;
 }

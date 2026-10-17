@@ -44,6 +44,8 @@ export async function cancelRequesterRequestAction(
   if (!result.ok) return authFailure(result.message);
 
   revalidatePath(ROUTES.dashboardRequests);
+  revalidatePath(ROUTES.tutorRequests);
+  revalidatePath(ROUTES.tutorDashboard);
   return authSuccess("Your request was cancelled.");
 }
 

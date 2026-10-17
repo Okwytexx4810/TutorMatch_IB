@@ -35,8 +35,15 @@ export interface TutorReviewRow {
   created_at: string;
 }
 
+export interface TutorOffering {
+  subject: string;
+  level: EducationLevel;
+}
+
 export interface TutorDetailResult {
   tutor: TutorProfile | null;
+  /** Real subject+level pairs from `tutor_subjects`, not a cartesian product. */
+  offerings: TutorOffering[];
   reviews: TutorReviewRow[];
   isError: boolean;
   /** Server-side detail; never rendered to visitors. */
@@ -63,6 +70,7 @@ export async function getTutorProfileById(
 ): Promise<TutorDetailResult> {
   const failure = (message: string): TutorDetailResult => ({
     tutor: null,
+    offerings: [],
     reviews: [],
     isError: true,
     errorMessage: message,
@@ -96,7 +104,13 @@ export async function getTutorProfileById(
   if (tutorResult.error) return failure(tutorResult.error.message);
 
   if (!tutorResult.data) {
-    return { tutor: null, reviews: [], isError: false, errorMessage: null };
+    return {
+      tutor: null,
+      offerings: [],
+      reviews: [],
+      isError: false,
+      errorMessage: null,
+    };
   }
 
   const [ratingResult, reviewResult] = await Promise.all([
@@ -113,8 +127,8 @@ export async function getTutorProfileById(
       .limit(5),
   ]);
 
-  if (ratingResult.error) return failure(ratingResult.error.message);
-  if (reviewResult.error) return failure(reviewResult.error.message);
+  // Ratings and reviews are display-only. A failure there must not hide the
+  // profile or the request form.
 
   const row = tutorResult.data as unknown as {
     id: string;
@@ -140,8 +154,12 @@ export async function getTutorProfileById(
     }> | null;
   };
 
+  const offerings: TutorOffering[] = (row.tutor_subjects ?? []).map((entry) => ({
+    subject: entry.subject,
+    level: entry.level,
+  }));
   const subjects = Array.from(
-    new Set((row.tutor_subjects ?? []).map((entry) => entry.subject)),
+    new Set(offerings.map((entry) => entry.subject)),
   );
   const levels = Array.from(
     new Set((row.tutor_subjects ?? []).map((entry) => entry.level)),
@@ -170,7 +188,7 @@ export async function getTutorProfileById(
           (DAY_PERIOD_INDEX.get(b.period) ?? 0),
     );
 
-  const rating = ratingResult.data as
+  const rating = (ratingResult.error ? null : ratingResult.data) as
     | { tutor_id: string; average_rating: number | string; review_count: number }
     | null
     | undefined;
@@ -203,7 +221,10 @@ export async function getTutorProfileById(
 
   return {
     tutor,
-    reviews: (reviewResult.data as TutorReviewRow[] | null | undefined) ?? [],
+    offerings,
+    reviews: reviewResult.error
+      ? []
+      : ((reviewResult.data as TutorReviewRow[] | null | undefined) ?? []),
     isError: false,
     errorMessage: null,
   };

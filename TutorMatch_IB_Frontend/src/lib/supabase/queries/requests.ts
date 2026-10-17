@@ -81,6 +81,12 @@ interface RequestRow {
   created_at: string;
 }
 
+/** PostgREST returns a to-one embed as an object and a to-many embed as an array. */
+function asList<T>(value: T | T[] | null | undefined): T[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
 function toRequestListItem(row: RequestRow): RequestListItem {
   return {
     id: row.id,
@@ -150,7 +156,7 @@ export async function getRequesterRequests(
 
   return {
     requests: rows.map((row) => {
-      const tutorRow = row.tutor_profiles?.[0] ?? null;
+      const tutorRow = asList(row.tutor_profiles)[0] ?? null;
       return {
         ...toRequestListItem(row),
         tutor: tutorRow
@@ -188,23 +194,52 @@ export async function getTutorRequests(
       .eq("tutor_id", tutorId);
   };
 
-  let result = await buildQuery(true);
+  const buildPlainQuery = (includeLevelLocation: boolean) => {
+    const columns: string = includeLevelLocation
+      ? REQUEST_COLUMNS
+      : REQUEST_COLUMNS_BASE;
+    return supabase.from("tutor_requests").select(columns).eq("tutor_id", tutorId);
+  };
+
+  type InboxQuery = {
+    data: unknown;
+    error: { code?: string; message?: string } | null;
+  };
+
+  let result = (await buildQuery(true)) as InboxQuery;
   if (result.error && isMissingColumnError(result.error, "level")) {
-    result = await buildQuery(false);
+    result = (await buildQuery(false)) as InboxQuery;
+  }
+
+  // `bookings.request_id` is a unique foreign key, and a missing relationship
+  // (Stage C not applied) makes the embed fail. Either way the inbox must still
+  // list the requests so the tutor can accept or decline them.
+  if (result.error) {
+    const plain = (await buildPlainQuery(
+      !isMissingColumnError(result.error, "level"),
+    )) as InboxQuery;
+    result =
+      plain.error && isMissingColumnError(plain.error, "level")
+        ? ((await buildPlainQuery(false)) as InboxQuery)
+        : plain;
   }
 
   if (result.error) {
-    return { requests: [], isError: true, errorMessage: result.error.message };
+    return {
+      requests: [],
+      isError: true,
+      errorMessage: result.error.message ?? null,
+    };
   }
 
   const rows = result.data as unknown as (RequestRow & {
-    bookings: Array<{ status: BookingStatus }> | null;
+    bookings?: { status: BookingStatus } | Array<{ status: BookingStatus }> | null;
   })[];
 
   const requests = rows
     .map((row): TutorRequestListItem => ({
       ...toRequestListItem(row),
-      hasConfirmedBooking: (row.bookings ?? []).some(
+      hasConfirmedBooking: asList(row.bookings).some(
         (booking) => booking.status === "confirmed",
       ),
     }))

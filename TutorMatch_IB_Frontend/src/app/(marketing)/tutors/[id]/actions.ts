@@ -54,6 +54,8 @@ export async function sendTutorRequestAction(
   // page is where the request now lives.
   revalidatePath(ROUTES.tutorProfile(parsed.data.tutorId));
   revalidatePath(ROUTES.dashboardRequests);
+  revalidatePath(ROUTES.tutorRequests);
+  revalidatePath(ROUTES.tutorDashboard);
 
   return authSuccess(
     "Your request was sent. You can track it from your requests page.",

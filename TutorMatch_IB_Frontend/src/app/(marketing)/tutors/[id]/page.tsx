@@ -333,8 +333,7 @@ export default async function TutorProfilePage({
                 <RequestForm
                   tutorId={tutor.id}
                   tutorName={displayName}
-                  subjects={tutor.subjects}
-                  levels={tutor.educationLevels}
+                  offerings={result.offerings}
                   defaultLocation={requesterLocation}
                 />
               ) : (

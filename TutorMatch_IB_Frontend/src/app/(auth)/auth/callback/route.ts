@@ -98,17 +98,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Bootstrap an allow-listed administrator before choosing the destination, so
   // the fresh admin is routed to /admin rather than a student dashboard.
-  await promoteConfiguredAdmin(data.user.id, data.user.email);
+  const promoted = await promoteConfiguredAdmin(data.user.id, data.user.email);
 
   // Default destination follows the database role. `next` still wins when it is
   // present, and `isSafeNextPath` has already rejected anything off-site.
+  // An allow-listed administrator is the exception: they always land on /admin.
   //
   // The session established above lives in this client's memory only, because the
   // cookies are attached to the outgoing response, so the live client is handed
   // to the reader rather than reading the (still anonymous) request cookies.
+  const role = promoted
+    ? "admin"
+    : await readTrustedRole(supabase, data.user.id);
   const destination =
-    next ??
-    homeForRole(await readTrustedRole(supabase, data.user.id));
+    role === "admin" ? homeForRole("admin") : (next ?? homeForRole(role));
   const response = NextResponse.redirect(new URL(destination, url.origin));
 
   for (const { name, value, options } of pending) {

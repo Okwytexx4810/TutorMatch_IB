@@ -1,7 +1,9 @@
 "use client";
 
 import { Loader2, Send } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+
+import type { TutorOffering } from "@/lib/supabase/queries/tutor-detail";
 
 import { sendTutorRequestAction } from "@/app/(marketing)/tutors/[id]/actions";
 import { AuthFormAlert } from "@/components/forms/auth-form-alert";
@@ -38,16 +40,13 @@ const SELECT_CLASS =
 export function RequestForm({
   tutorId,
   tutorName,
-  subjects,
-  levels,
+  offerings,
   defaultLocation,
 }: {
   tutorId: string;
   tutorName: string;
-  /** Distinct subjects the tutor listed in `tutor_subjects`. */
-  subjects: string[];
-  /** Distinct levels the tutor teaches. */
-  levels: string[];
+  /** Real subject+level pairs from `tutor_subjects`. */
+  offerings: TutorOffering[];
   /** The requester's own approved location, offered as the default. */
   defaultLocation: string | null;
 }) {
@@ -56,8 +55,17 @@ export function RequestForm({
     initialAuthFormState,
   );
   const errors = state.fieldErrors ?? {};
+  const subjects = Array.from(new Set(offerings.map((offering) => offering.subject)));
+  const [subject, setSubject] = useState("");
+  const levels = Array.from(
+    new Set(
+      offerings
+        .filter((offering) => offering.subject === subject)
+        .map((offering) => offering.level),
+    ),
+  );
 
-  if (subjects.length === 0 || levels.length === 0) {
+  if (offerings.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
         {tutorName} has not listed the subjects and levels they teach yet, so
@@ -79,7 +87,8 @@ export function RequestForm({
               id="request-subject"
               name="subject"
               required
-              defaultValue=""
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
               aria-invalid={Boolean(errors.subject?.[0])}
               className={SELECT_CLASS}
             >
@@ -104,6 +113,8 @@ export function RequestForm({
               name="level"
               required
               defaultValue=""
+              key={subject}
+              disabled={levels.length === 0}
               aria-invalid={Boolean(errors.level?.[0])}
               className={SELECT_CLASS}
             >
